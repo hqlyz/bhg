@@ -78,7 +78,7 @@ func loopup(fqdn, dnsServer string) []result {
 		return results
 	}
 	for _, ip := range ips {
-		results = append(results, result{IPAddress: ip, Hostname: cfqdn})
+		results = append(results, result{IPAddress: ip, Hostname: fqdn})
 	}
 	return results
 }
