@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"text/tabwriter"
+	"time"
 
 	"github.com/miekg/dns"
 )
@@ -65,7 +66,7 @@ func lookupCNAME(fqdn, dnsServer string) ([]string, error) {
 	return fqdns, nil
 }
 
-func loopup(fqdn, dnsServer string) []result {
+func lookup(fqdn, dnsServer string) []result {
 	var results []result
 	var cfqdn = fqdn
 	for {
@@ -89,8 +90,9 @@ type empty struct{}
 
 func worker(tracker chan empty, fqdns chan string, gather chan []result, serverAddr string) {
 	for fqdn := range fqdns {
-		result := loopup(fqdn, serverAddr)
+		result := lookup(fqdn, serverAddr)
 		if len(result) > 0 {
+			fmt.Printf("track %s done - %v\n", fqdn, time.Now())
 			gather <- result
 		}
 	}
@@ -140,7 +142,7 @@ func main() {
 	close(gather)
 	<- tracker
 
-	w := tabwriter.NewWriter(os.Stdout, 8, 4, 0, ' ', 0)
+	w := tabwriter.NewWriter(os.Stdout, 18, 4, 0, ' ', 0)
 	for _, r := range results {
 		fmt.Fprintf(w, "%s\t%s\n", r.Hostname, r.IPAddress)
 	}
