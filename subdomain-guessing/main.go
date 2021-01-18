@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"text/tabwriter"
 
 	"github.com/miekg/dns"
 )
@@ -38,7 +40,7 @@ func lookupA(fqdn, dnsServer string) ([]string, error) {
 	}
 	for _, answer := range r.Answer {
 		if a, ok := answer.(*dns.A); ok {
-			ips = append(ips, string(a.A))
+			ips = append(ips, a.A.String())
 		}
 	}
 	return ips, nil
@@ -83,10 +85,64 @@ func loopup(fqdn, dnsServer string) []result {
 	return results
 }
 
+type empty struct{}
+
+func worker(tracker chan empty, fqdns chan string, gather chan []result, serverAddr string) {
+	for fqdn := range fqdns {
+		result := loopup(fqdn, serverAddr)
+		if len(result) > 0 {
+			gather <- result
+		}
+	}
+	var e empty
+	tracker <- e
+}
+
 func main() {
 	if *flDomain == "" || *flWordlist == "" {
 		fmt.Println("-domain and -wordlist are required")
 		os.Exit(1)
 	}
 	fmt.Println(*flWorkerCount, *flServerAddr)
+
+	var results []result
+	fqdns := make(chan string, *flWorkerCount)
+	gather := make(chan []result)
+	tracker := make(chan empty)
+
+	fh, err := os.Open(*flWordlist)
+	if err != nil {
+		panic(err)
+	}
+	defer fh.Close()
+	scanner := bufio.NewScanner(fh)
+
+	for i := 0; i < *flWorkerCount; i++ {
+		go worker(tracker, fqdns, gather, *flServerAddr)
+	}
+
+	for scanner.Scan() {
+		fqdns <- fmt.Sprintf("%s.%s", scanner.Text(), *flDomain)
+	}
+
+	go func() {
+		for g := range gather {
+			results = append(results, g...)
+		}
+		var e empty
+		tracker <- e
+	}()
+
+	close(fqdns)
+	for i := 0; i < *flWorkerCount; i++ {
+		<- tracker
+	}
+	close(gather)
+	<- tracker
+
+	w := tabwriter.NewWriter(os.Stdout, 8, 4, 0, ' ', 0)
+	for _, r := range results {
+		fmt.Fprintf(w, "%s\t%s\n", r.Hostname, r.IPAddress)
+	}
+	w.Flush()
 }
