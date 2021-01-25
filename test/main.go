@@ -1,8 +1,6 @@
 package main
 
-import (
-	"fmt"
-)
+import "net/http"
 
 func unpad(buf []byte) []byte {
 	// Assume valid length and padding. Should add checks
@@ -11,11 +9,7 @@ func unpad(buf []byte) []byte {
 }
 
 func main() {
-	// fs := http.FileServer(http.Dir("g:/books"))
-	// http.Handle("/", fs)
-	// http.ListenAndServe(":8080", nil)
-
-	b := []byte{65, 66, 67, 68, 69}
-	b2 := unpad(b)
-	fmt.Println(b2)
+	fs := http.FileServer(http.Dir("E:/phpstudy_pro/WWW"))
+	http.Handle("/", fs)
+	http.ListenAndServe(":8999", nil)
 }
